@@ -29,10 +29,7 @@ class Client:
         input_thread = threading.Thread(target=self.wait_for_input)
         input_thread.daemon = True
         input_thread.start()
-        while self.is_working:
-            while self.is_connected:
-                data = self.sock.recv(CHUNK_SIZE)
-                print(self.parse_message(data.decode("cp1251")))
+        self.wait_for_response()
         input_thread.join()
 
     def wait_for_input(self):
@@ -41,29 +38,11 @@ class Client:
             if self.is_connected:
                 self.sock.sendall(bytes(message, "cp1251"))
 
-    def parse_message(self, raw_message: str) -> str:
-        result = []
-        for current in raw_message.split("\r\n"):
-            for expr in [MESSAGE_EXPR, NOTIFICATION_EXPR]:
-                match = expr.search(current)  # TODO: сделать норм название переменной
-                if match:
-                    current = self.parse_match_obj(match, expr.pattern)
-                    break
-            result.append(current)
-        return "\r\n".join(result)
-
-    def parse_match_obj(self, expr, pattern: str) -> str:
-        groups = expr.groupdict()
-        if pattern == NOTIFICATION_EXPR.pattern:
-            return f"<{groups['nick']}> {COMMAND_REPR[groups['command']]} {groups['target']}"
-
-        if groups["target"] == self.nickname and groups["command"] == "PRIVMSG":
-            return f"PM from <{groups['sender']}>: {groups['text']}"
-
-        if groups["command"] == "PRIVMSG":
-            return f"[{groups['target']}] <{groups['sender']}>: {groups['text']}"
-
-        return f"[{groups['sender']}] >> {groups['text']}"
+    def wait_for_response(self):
+        while self.is_working:
+            while self.is_connected:
+                data = self.sock.recv(CHUNK_SIZE)
+                print(str(Response(data)))
 
 
 class InputParser:
@@ -98,6 +77,38 @@ class InputParser:
             else:
                 return result
         return f"PRIVMSG {self.client.current_channel} :{text}"
+
+
+class Response:
+    def __init__(self, raw_response: bytes):
+        self.decoded_data = raw_response.decode("cp1251")
+
+    def from_bytes(self) -> str:
+        result = []
+        for current in self.decoded_data.split("\r\n"):
+            for expr in [MESSAGE_EXPR, NOTIFICATION_EXPR]:
+                match = expr.search(current)  # TODO: сделать норм название переменной
+                if match:
+                    current = self.parse_match_obj(match, expr.pattern)
+                    break
+            result.append(current)
+        return "\r\n".join(result)
+
+    def parse_match_obj(self, expr, pattern: str) -> str:
+        groups = expr.groupdict()
+        if pattern == NOTIFICATION_EXPR.pattern:
+            return f"<{groups['nick']}> {COMMAND_REPR[groups['command']]} {groups['target']}"
+
+        # if groups["target"] == self.nickname and groups["command"] == "PRIVMSG": TODO: Придумать как реализовать PM
+        #     return f"PM from <{groups['sender']}>: {groups['text']}"
+
+        if groups["command"] == "PRIVMSG":
+            return f"[{groups['target']}] <{groups['sender']}>: {groups['text']}"
+
+        return f"[{groups['sender']}] >> {groups['text']}"
+
+    def __str__(self):
+        return self.from_bytes()
 
 
 class ClientCommand:
