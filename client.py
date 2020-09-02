@@ -18,23 +18,12 @@ COMMAND_REPR = {
 class Client:
     def __init__(self):
         self.sock = socket.socket()
-        self.nickname = "defau"
+        self.nickname = "default"
         self.joined_channels = set()
         self.current_channel = ""
         self.is_connected = False
         self.is_working = True
-        cmd = ClientCommand(self)
-        self.commands = {
-            "/ns": cmd.send_to_nick_service,
-            "/nick": cmd.change_nick,
-            "/join": cmd.join_channel,
-            "/server": cmd.connect,
-            "/names": cmd.show_names,
-            "/switch": cmd.switch_channel,
-            "/leave": cmd.leave_channel,
-            "/quit": cmd.disconnect,
-            "/exit": cmd.exit_client
-        }
+        self.parser = InputParser(self)
 
     def start_client(self):
         input_thread = threading.Thread(target=self.wait_for_input)
@@ -48,27 +37,9 @@ class Client:
 
     def wait_for_input(self):
         while self.is_working:
-            message = input()
-            message = self.parse_input(message) + "\r\n"
+            message = self.parser.parse_message(input()) + "\r\n"
             if self.is_connected:
                 self.sock.sendall(bytes(message, "cp1251"))
-
-    def parse_input(self, text: str) -> str:
-        if text.startswith("/"):
-            try:
-                args = text.split(" ")
-                command_name = args[0]
-                command_args = args[1:]
-                if command_name not in self.commands:
-                    print("Неизвестная команда")
-                    return ""
-                result = self.commands[command_name](*command_args)
-            except TypeError:
-                print("Неверное количество аргументов для команды")
-                return ""
-            else:
-                return result
-        return f"PRIVMSG {self.current_channel} :{text}"
 
     def parse_message(self, raw_message: str) -> str:
         result = []
@@ -93,6 +64,40 @@ class Client:
             return f"[{groups['target']}] <{groups['sender']}>: {groups['text']}"
 
         return f"[{groups['sender']}] >> {groups['text']}"
+
+
+class InputParser:
+    def __init__(self, client: Client):
+        self.client = client
+        cmd = ClientCommand(client)
+        self.commands = {
+            "/ns": cmd.send_to_nick_service,
+            "/nick": cmd.change_nick,
+            "/join": cmd.join_channel,
+            "/server": cmd.connect,
+            "/names": cmd.show_names,
+            "/switch": cmd.switch_channel,
+            "/leave": cmd.leave_channel,
+            "/quit": cmd.disconnect,
+            "/exit": cmd.exit_client
+        }
+
+    def parse_message(self, text: str) -> str:
+        if text.startswith("/"):
+            try:
+                args = text.split(" ")
+                command_name = args[0]
+                command_args = args[1:]
+                if command_name not in self.commands:
+                    print("Неизвестная команда")
+                    return ""
+                result = self.commands[command_name](*command_args)
+            except TypeError:
+                print("Неверное количество аргументов для команды")
+                return ""
+            else:
+                return result
+        return f"PRIVMSG {self.client.current_channel} :{text}"
 
 
 class ClientCommand:
