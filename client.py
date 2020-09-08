@@ -25,6 +25,12 @@ class Client:
         self.is_working = True
         self.parser = InputParser(self)
 
+    @property
+    def cmd_prompt(self):
+        if not self.current_channel:
+            return f"<{self.nickname}>: "
+        return f"[{self.current_channel}] <{self.nickname}>: "
+
     def start_client(self):
         input_thread = threading.Thread(target=self.wait_for_input)
         input_thread.daemon = True
@@ -34,7 +40,7 @@ class Client:
 
     def wait_for_input(self):
         while self.is_working:
-            message = self.parser.parse_message(input()) + "\r\n"
+            message = self.parser.parse_message(input(self.cmd_prompt)) + "\r\n"
             if self.is_connected:
                 self.sock.sendall(bytes(message, "cp1251"))
 
@@ -50,6 +56,8 @@ class InputParser:
         self.client = client
         cmd = ClientCommand(client)
         self.commands = {
+            "/bs": cmd.send_to_bot_service,
+            "/cs": cmd.send_to_chan_service,
             "/ns": cmd.send_to_nick_service,
             "/nick": cmd.change_nick,
             "/join": cmd.join_channel,
@@ -122,12 +130,19 @@ class ClientCommand:
     def send_to_nick_service(self, *args) -> str:
         return f"PRIVMSG nickserv :{' '.join(args)}"
 
+    def send_to_chan_service(self, *args) -> str:
+        return f"PRIVMSG chanserv :{' '.join(args)}"
+
+    def send_to_bot_service(self, *args) -> str:
+        return f"PRIVMSG botserv :{' '.join(args)}"
+
     def join_channel(self, ch_name: str, password="") -> str:
-        if ch_name.lower() in self.client.joined_channels:
+        ch_name = ch_name.lower()
+        if ch_name in self.client.joined_channels:
             print("Вы уже присоединились к данному каналу!")
             return ""
         self.client.current_channel = ch_name
-        self.client.joined_channels.add(ch_name.lower())
+        self.client.joined_channels.add(ch_name)
         return f"JOIN {ch_name} {password}"
 
     def disconnect(self) -> str:
@@ -148,8 +163,8 @@ class ClientCommand:
         return f"NAMES {self.client.current_channel}"
 
     def switch_channel(self, ch_name="") -> str:
-        print(f"Сейчас вы пишете в канале: {self.client.current_channel}")
-        if ch_name.lower() in self.client.joined_channels:
+        ch_name = ch_name.lower()
+        if ch_name in self.client.joined_channels and ch_name != self.client.current_channel:
             print(f"Переключение текущего канала на {ch_name}...")
             self.client.current_channel = ch_name
         return ""
@@ -158,7 +173,7 @@ class ClientCommand:
         current = self.client.current_channel
         if current in self.client.joined_channels:
             self.client.current_channel = ""
-            self.client.joined_channels.remove(current)
+            self.client.joined_channels.remove(current.lower())
         return f"PART {current}"
 
     def exit_client(self):
