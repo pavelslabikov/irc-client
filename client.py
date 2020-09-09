@@ -1,24 +1,22 @@
 import socket
 import threading
 import re
+from configparser import ConfigParser
 
 CHUNK_SIZE = 1024
 
 MESSAGE_EXPR = re.compile(r":(?P<sender>[^\s!]+)(!.*)? (?P<command>PRIVMSG|NOTICE|\d{3}) (?P<target>.+) :(?P<text>.+)")
 NOTIFICATION_EXPR = re.compile(r":(?P<nick>[^\s!]+)!?\S+ (?P<command>JOIN|PART|NICK|MODE).* :?(?P<target>\S+)")
 
-COMMAND_REPR = {
-    "JOIN": "joined",
-    "PART": "left",
-    "NICK": "is now known as",
-    "MODE": "sets mode:"
-}
+CODE_PAGES = {"cp1251", "koi8", "translit", "dos", "mac", "iso"}
 
 
 class Client:
-    def __init__(self):
+    def __init__(self, config: ConfigParser):
         self.sock = socket.socket()
-        self.nickname = "default"
+        self.config = config
+        self.nickname = config.get("Settings", "Nickname")
+        self.code_page = config.get("Settings", "CodePage")
         self.joined_channels = set()
         self.current_channel = ""
         self.is_connected = False
@@ -31,24 +29,24 @@ class Client:
             return f"<{self.nickname}>: "
         return f"[{self.current_channel}] <{self.nickname}>: "
 
-    def start_client(self):
+    def start_client(self) -> None:
         input_thread = threading.Thread(target=self.wait_for_input)
         input_thread.daemon = True
         input_thread.start()
         self.wait_for_response()
         input_thread.join()
 
-    def wait_for_input(self):
+    def wait_for_input(self) -> None:
         while self.is_working:
             message = self.parser.parse_message(input(self.cmd_prompt)) + "\r\n"
             if self.is_connected:
                 self.sock.sendall(bytes(message, "cp1251"))
 
-    def wait_for_response(self):
+    def wait_for_response(self) -> None:
         while self.is_working:
             while self.is_connected:
                 data = self.sock.recv(CHUNK_SIZE)
-                print(str(Response(data)))
+                print(str(Response(data, self.code_page)))
 
 
 class InputParser:
@@ -59,7 +57,9 @@ class InputParser:
             "/bs": cmd.send_to_bot_service,
             "/cs": cmd.send_to_chan_service,
             "/ns": cmd.send_to_nick_service,
+            "/chcp": cmd.change_code_page,
             "/nick": cmd.change_nick,
+            "/add": cmd.add_to_favourites,
             "/join": cmd.join_channel,
             "/server": cmd.connect,
             "/names": cmd.show_names,
@@ -88,8 +88,15 @@ class InputParser:
 
 
 class Response:
-    def __init__(self, raw_response: bytes):
-        self.decoded_data = raw_response.decode("cp1251")
+    def __init__(self, raw_response: bytes, code_page: str):
+        self.decoded_data = raw_response.decode(code_page)
+
+    command_repr = {
+        "JOIN": "joined",
+        "PART": "left",
+        "NICK": "is now known as",
+        "MODE": "sets mode:"
+    }
 
     def from_bytes(self) -> str:
         result = []
@@ -105,7 +112,7 @@ class Response:
     def parse_match_obj(self, expr, pattern: str) -> str:
         groups = expr.groupdict()
         if pattern == NOTIFICATION_EXPR.pattern:
-            return f"<{groups['nick']}> {COMMAND_REPR[groups['command']]} {groups['target']}"
+            return f"<{groups['nick']}> {self.command_repr[groups['command']]} {groups['target']}"
 
         # if groups["target"] == self.nickname and groups["command"] == "PRIVMSG": TODO: Придумать как реализовать PM
         #     return f"PM from <{groups['sender']}>: {groups['text']}"
@@ -124,6 +131,7 @@ class ClientCommand:
         self.client = client
 
     def change_nick(self, new_nickname: str) -> str:
+        self.client.config.set("Settings", "Nickname", new_nickname)  # TODO: написать регулярку для никнейма
         self.client.nickname = new_nickname
         return f"NICK {new_nickname}"
 
@@ -146,10 +154,28 @@ class ClientCommand:
         return f"JOIN {ch_name} {password}"
 
     def disconnect(self) -> str:
-        self.client.is_connected = False
-        self.client.joined_channels = set()
-        self.client.current_channel = ""
-        self.client.sock.shutdown(socket.SHUT_WR)
+        if self.client.is_connected:
+            self.client.is_connected = False
+            self.client.joined_channels = set()
+            self.client.current_channel = ""
+            self.client.sock.shutdown(socket.SHUT_WR)
+        return ""
+
+    def change_code_page(self, code_page: str) -> str:
+        if not code_page.lower() in CODE_PAGES:
+            print("Недопустимая кодировка")
+            return ""
+        print(f"Текущая кодировка изменена на {code_page}")
+        self.client.code_page = code_page
+        self.client.config.set("Settings", "CodePage", code_page)
+        return ""
+
+    def add_to_favourites(self, host: str) -> str:
+        if self.client.config.has_option("Servers", host):
+            print("Сервер уже находится в списке избранных")
+            return ""
+        print(f"Сервер {host} добавлен в список избранных")
+        self.client.config.set("Servers", host)
         return ""
 
     def connect(self, server: str, port=6667) -> str:
@@ -176,13 +202,14 @@ class ClientCommand:
             self.client.joined_channels.remove(current.lower())
         return f"PART {current}"
 
-    def exit_client(self):
+    def refresh_config(self) -> None:
+        with open("config.ini", "w") as file:
+            self.client.config.write(file)
+
+    def exit_client(self) -> None:
+        self.refresh_config()
         self.client.is_working = False
         if self.client.is_connected:
             self.client.is_connected = False
             self.client.sock.shutdown(socket.SHUT_WR)
         exit()
-
-
-c = Client()
-c.start_client()
