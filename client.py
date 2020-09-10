@@ -8,7 +8,7 @@ CHUNK_SIZE = 1024
 MESSAGE_EXPR = re.compile(r":(?P<sender>[^\s!]+)(!.*)? (?P<command>PRIVMSG|NOTICE|\d{3}) (?P<target>.+) :(?P<text>.+)")
 NOTIFICATION_EXPR = re.compile(r":(?P<nick>[^\s!]+)!?\S+ (?P<command>JOIN|PART|NICK|MODE).* :?(?P<target>\S+)")
 
-CODE_PAGES = {"cp1251", "koi8", "translit", "dos", "mac", "iso"}
+CODE_PAGES = {"cp1251", "koi8_r", "cp866", "mac_cyrillic", "iso8859_5"}
 
 
 class Client:
@@ -17,6 +17,7 @@ class Client:
         self.config = config
         self.nickname = config.get("Settings", "Nickname")
         self.code_page = config.get("Settings", "CodePage")
+        self.host_name = ""
         self.joined_channels = set()
         self.current_channel = ""
         self.is_connected = False
@@ -47,6 +48,10 @@ class Client:
             while self.is_connected:
                 data = self.sock.recv(CHUNK_SIZE)
                 print(str(Response(data, self.code_page)))
+
+    def refresh_config(self) -> None:
+        with open("config.ini", "w") as file:
+            self.config.write(file)
 
 
 class InputParser:
@@ -154,23 +159,28 @@ class ClientCommand:
         return f"JOIN {ch_name} {password}"
 
     def disconnect(self) -> str:
-        if self.client.is_connected:
-            self.client.is_connected = False
-            self.client.joined_channels = set()
-            self.client.current_channel = ""
-            self.client.sock.shutdown(socket.SHUT_WR)
+        if not self.client.is_connected:
+            return ""
+        self.client.host_name = ""
+        self.client.is_connected = False
+        self.client.joined_channels = set()
+        self.client.current_channel = ""
+        self.client.sock.shutdown(socket.SHUT_WR)
         return ""
 
     def change_code_page(self, code_page: str) -> str:
         if not code_page.lower() in CODE_PAGES:
-            print("Недопустимая кодировка")
+            print(f"Допустимые кодировки: {CODE_PAGES}")
             return ""
         print(f"Текущая кодировка изменена на {code_page}")
         self.client.code_page = code_page
         self.client.config.set("Settings", "CodePage", code_page)
         return ""
 
-    def add_to_favourites(self, host: str) -> str:
+    def add_to_favourites(self) -> str:
+        if not self.client.is_connected:
+            return ""
+        host = self.client.host_name
         if self.client.config.has_option("Servers", host):
             print("Сервер уже находится в списке избранных")
             return ""
@@ -182,6 +192,7 @@ class ClientCommand:
         print(f"Подключение к {server}...")
         self.client.sock = socket.socket()
         self.client.sock.connect((server, port))
+        self.client.host_name = server
         self.client.is_connected = True
         return f"NICK {self.client.nickname}\r\nUSER 1 1 1 1"
 
@@ -202,12 +213,8 @@ class ClientCommand:
             self.client.joined_channels.remove(current.lower())
         return f"PART {current}"
 
-    def refresh_config(self) -> None:
-        with open("config.ini", "w") as file:
-            self.client.config.write(file)
-
     def exit_client(self) -> None:
-        self.refresh_config()
+        self.client.refresh_config()
         self.client.is_working = False
         if self.client.is_connected:
             self.client.is_connected = False
