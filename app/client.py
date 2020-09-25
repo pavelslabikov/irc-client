@@ -5,6 +5,7 @@ from app.commands import ClientCommand
 from configparser import ConfigParser
 
 BUFFER_SIZE = 4096
+
 MESSAGE_EXPR = re.compile(r":(?P<sender>[^\s!]+)(!.*)? (?P<command>PRIVMSG|NOTICE|\d{3}) (?P<target>.+) :(?P<text>.+)")
 NOTIFICATION_EXPR = re.compile(r":(?P<nick>[^\s!]+)!?\S+ (?P<command>JOIN|PART|NICK|MODE).* :?(?P<target>\S+)")
 SERVER_MSG_EXPR = re.compile(r":(?P<sender>\S+) (?P<command>\d{3}) \S+ (?P<text>.+) :")
@@ -48,7 +49,7 @@ class Client:
                 print(Response(data, code_page))
 
     def refresh_config(self) -> None:
-        with open("../config/config.ini", "w") as file:
+        with open("config/config.ini", "w") as file:
             self.config.write(file)
 
 
@@ -59,6 +60,7 @@ class InputParser:
         self.commands = {
             "/chcp": cmd.change_code_page,
             "/nick": cmd.change_nick,
+            "/help": cmd.show_help,
             "/fav": cmd.show_favourites,
             "/server": cmd.connect,
             "/exit": cmd.exit_client

@@ -1,12 +1,8 @@
 import unittest
 import configparser
 import warnings
+from app import const
 from app import client as app
-
-DEFAULT_CONFIG = {
-    "Settings": {"nickname": "undefined", "codepage": "cp1251"},
-    "Servers": {}
-}
 
 
 class TestResponseMethods(unittest.TestCase):
@@ -36,7 +32,7 @@ class TestInputParserMethods(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         test_config = configparser.ConfigParser()
-        test_config.read_dict(DEFAULT_CONFIG)
+        test_config.read_dict(const.DEFAULT_CONFIG)
         client = app.Client(test_config)
         client.is_connected = True
         cls.parser = app.InputParser(client)

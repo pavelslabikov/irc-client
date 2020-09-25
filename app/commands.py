@@ -1,5 +1,6 @@
 import socket
 import re
+import app.const as const
 
 NICK_EXPR = re.compile(r"^[a-zA-Zа-я-А-Я][\w]+")
 CODE_PAGES = {"cp1251", "koi8_r", "cp866", "mac_cyrillic", "iso8859_5"}
@@ -8,6 +9,29 @@ CODE_PAGES = {"cp1251", "koi8_r", "cp866", "mac_cyrillic", "iso8859_5"}
 class ClientCommand:
     def __init__(self, client):
         self.client = client
+
+    def connect(self, server: str, port=6667) -> str:
+        if self.client.is_connected:
+            return ""
+        print(f"Подключение к {server}...")
+        self.client.sock = socket.socket()
+        self.client.sock.settimeout(10)
+        try:
+            self.client.sock.connect((server, port))
+        except socket.gaierror:
+            print(f"Не удалось подключиться по заданному адресу: {server}")
+            return ""
+        self.client.sock.settimeout(None)
+        self.client.hostname = server
+        self.client.is_connected = True
+        return f"NICK {self.client.nickname}\r\nUSER 1 1 1 1"
+
+    def disconnect(self) -> None:
+        self.client.hostname = ""
+        self.client.is_connected = False
+        self.client.joined_channels = set()
+        self.client.current_channel = ""
+        self.client.sock.shutdown(socket.SHUT_WR)
 
     def change_nick(self, new_nickname: str) -> str:
         if not NICK_EXPR.search(new_nickname):
@@ -29,12 +53,21 @@ class ClientCommand:
         self.client.joined_channels.add(ch_name)
         return f"JOIN {ch_name} {password}"
 
-    def disconnect(self) -> None:
-        self.client.host_name = ""
-        self.client.is_connected = False
-        self.client.joined_channels = set()
-        self.client.current_channel = ""
-        self.client.sock.shutdown(socket.SHUT_WR)
+    def switch_channel(self, ch_name) -> None:
+        ch_name = ch_name.lower()
+        if ch_name in self.client.joined_channels and ch_name != self.client.current_channel:
+            print(f"Переключение текущего канала на {ch_name}...")
+            self.client.current_channel = ch_name
+
+    def leave_channel(self) -> str:
+        current = self.client.current_channel.lower()
+        if current in self.client.joined_channels:
+            self.client.current_channel = ""
+            self.client.joined_channels.remove(current)
+        return f"PART {current}"
+
+    def show_channels(self) -> str:
+        return "LIST"
 
     def change_code_page(self, code_page: str) -> None:
         if not code_page.lower() in CODE_PAGES:
@@ -56,40 +89,11 @@ class ClientCommand:
         for server, value in self.client.config.items("Servers"):
             print(server)
 
-    def connect(self, server: str, port=6667) -> str:
-        if self.client.is_connected:
-            return ""
-        print(f"Подключение к {server}...")
-        self.client.sock = socket.socket()
-        self.client.sock.settimeout(10)
-        try:
-            self.client.sock.connect((server, port))
-        except socket.gaierror:
-            print(f"Не удалось подключиться по заданному адресу: {server}")
-            return ""
-        self.client.sock.settimeout(None)
-        self.client.host_name = server
-        self.client.is_connected = True
-        return f"NICK {self.client.nickname}\r\nUSER 1 1 1 1"
-
     def show_names(self) -> str:
         return f"NAMES {self.client.current_channel}"
 
-    def switch_channel(self, ch_name) -> None:
-        ch_name = ch_name.lower()
-        if ch_name in self.client.joined_channels and ch_name != self.client.current_channel:
-            print(f"Переключение текущего канала на {ch_name}...")
-            self.client.current_channel = ch_name
-
-    def show_channels(self) -> str:
-        return "LIST"
-
-    def leave_channel(self) -> str:
-        current = self.client.current_channel.lower()
-        if current in self.client.joined_channels:
-            self.client.current_channel = ""
-            self.client.joined_channels.remove(current)
-        return f"PART {current}"
+    def show_help(self) -> None:
+        print(const.HELP_MESSAGE)
 
     def exit_client(self) -> None:
         self.client.refresh_config()
