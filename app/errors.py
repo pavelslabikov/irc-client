@@ -2,7 +2,7 @@ class ApiError(Exception):
     arg = ""
 
 
-class ConfigError(ApiError):
+class InvalidConfigError(ApiError):
     def __init__(self, invalid_config):
         for key, value in invalid_config.items():
             self.arg += f"\n[{key}]\n"
@@ -11,3 +11,11 @@ class ConfigError(ApiError):
 
     def __str__(self):
         return f"Некорректное содержимое файла config.ini: {self.arg}"
+
+
+class ConfigNotFoundError(ApiError):
+    def __init__(self, path: str):
+        self.arg = path
+
+    def __str__(self):
+        return f"Не удалось найти конфигурационный файл по пути: {self.arg}"

@@ -16,3 +16,7 @@ DEFAULT_CONFIG = {
     "Settings": {"nickname": "undefined", "codepage": "cp1251"},
     "Servers": {}
 }
+
+CONFIG_PATH = "config.ini"
+
+BUFFER_SIZE = 4096

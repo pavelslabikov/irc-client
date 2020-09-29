@@ -1,10 +1,9 @@
 import socket
 import threading
 import re
+import app.const as const
 from app.commands import ClientCommand
 from configparser import ConfigParser
-
-BUFFER_SIZE = 4096
 
 MESSAGE_EXPR = re.compile(r":(?P<sender>[^\s!]+)(!.*)? (?P<command>PRIVMSG|NOTICE|\d{3}) (?P<target>.+) :(?P<text>.+)")
 NOTIFICATION_EXPR = re.compile(r":(?P<nick>[^\s!]+)!?\S+ (?P<command>JOIN|PART|NICK|MODE).* :?(?P<target>\S+)")
@@ -12,13 +11,14 @@ SERVER_MSG_EXPR = re.compile(r":(?P<sender>\S+) (?P<command>\d{3}) \S+ (?P<text>
 
 
 class Client:
-    def __init__(self, config: ConfigParser):
+    def __init__(self, config: ConfigParser, nickname: str, code_page: str):
         self.sock = socket.socket()
         self.config = config
-        self.nickname = config["Settings"]["nickname"]
-        self.hostname = ""
+        self.nickname = nickname
+        self.code_page = code_page
+        self.hostname = None
         self.joined_channels = set()
-        self.current_channel = ""
+        self.current_channel = None
         self.is_connected = False
         self.is_working = True
 
@@ -39,17 +39,16 @@ class Client:
         while self.is_working:
             message = parser.parse_message(input(self.cmd_prompt)) + "\r\n"
             if self.is_connected:
-                self.sock.sendall(bytes(message, "cp1251"))
+                self.sock.sendall(message.encode(self.code_page))
 
     def wait_for_response(self) -> None:
         while self.is_working:
             while self.is_connected:
-                data = self.sock.recv(BUFFER_SIZE)
-                code_page = self.config["Settings"]["codepage"]
-                print(Response(data, code_page))
+                data = self.sock.recv(const.BUFFER_SIZE)
+                print(Response(data, self.code_page))
 
     def refresh_config(self) -> None:
-        with open("config/config.ini", "w") as file:
+        with open(const.CONFIG_PATH, "w") as file:
             self.config.write(file)
 
 

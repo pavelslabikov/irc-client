@@ -7,20 +7,20 @@ from app import const
 
 def get_config() -> ConfigParser:
     current_config = ConfigParser(allow_no_value=True)
-    if not os.path.exists("config/config.ini"):
-        with open("config/config.ini", "w") as file:
-            current_config.read_dict(const.DEFAULT_CONFIG)
-            current_config.write(file)
+    if not os.path.exists(const.CONFIG_PATH):
+        raise errors.ConfigNotFoundError(const.CONFIG_PATH)
 
-    current_config.read("config/config.ini")
+    current_config.read(const.CONFIG_PATH)
     if not current_config.has_section("Settings") or not current_config.has_section("Servers"):
-        raise errors.ConfigError(current_config)
+        raise errors.InvalidConfigError(current_config)
+
     return current_config
 
 
 if __name__ == "__main__":
     try:
-        client = Client(get_config())
+        config = get_config()
+        client = Client(config, config["Settings"]["nickname"], config["Settings"]["codepage"])
         client.start_client()
     except errors.ApiError as e:
         print(e)
