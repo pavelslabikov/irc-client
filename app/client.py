@@ -2,7 +2,7 @@ import socket
 import threading
 import re
 import app.const as const
-from app.commands import ClientCommand
+import app.commands as cmd
 from configparser import ConfigParser
 
 MESSAGE_EXPR = re.compile(r":(?P<sender>[^\s!]+)(!.*)? (?P<command>PRIVMSG|NOTICE|\d{3}) (?P<target>.+) :(?P<text>.+)")
@@ -55,44 +55,37 @@ class Client:
 class InputParser:
     def __init__(self, client: Client):
         self.client = client
-        cmd = ClientCommand(client)
         self.commands = {
-            "/chcp": cmd.change_code_page,
-            "/nick": cmd.change_nick,
-            "/help": cmd.show_help,
-            "/fav": cmd.show_favourites,
-            "/server": cmd.connect,
-            "/exit": cmd.exit_client
-        }
-
-        self.network_commands = {
-            "/pm": cmd.send_personal_message,
-            "/add": cmd.add_to_favourites,
-            "/join": cmd.join_channel,
-            "/list": cmd.show_channels,
-            "/names": cmd.show_names,
-            "/leave": cmd.leave_channel,
-            "/quit": cmd.disconnect,
-            "/switch": cmd.switch_channel
+            "/chcp": cmd.ChangeCodePageCommand,
+            "/nick": cmd.ChangeNickCommand,
+            "/help": cmd.HelpCommand,
+            "/fav": cmd.ShowFavCommand,
+            "/server": cmd.ConnectCommand,
+            "/exit": cmd.ExitCommand,
+            "/pm": cmd.PrivateMessageCommand,
+            "/add": cmd.AddToFavCommand,
+            "/join": cmd.JoinCommand,
+            "/list": cmd.ShowChannelsCommand,
+            "/names": cmd.ShowNamesCommand,
+            "/leave": cmd.LeaveCommand,
+            "/quit": cmd.DisconnectCommand,
+            "/switch": cmd.SwitchCommand
         }
 
     def parse_message(self, text: str) -> str:
         if text.startswith("/"):
-            try:
-                args = text.split(" ")
-                result = ""
-                cmd_name = args[0]
-                cmd_args = args[1:]
-                if cmd_name not in self.commands and cmd_name not in self.network_commands:
-                    print("Неизвестная команда")
-                if cmd_name in self.network_commands and self.client.is_connected:
-                    result = self.network_commands[cmd_name](*cmd_args)
-                if cmd_name in self.commands:
-                    result = self.commands[cmd_name](*cmd_args)
-                if result:
-                    return result
-            except TypeError:
-                print(f"Неверное количество аргументов для команды: {cmd_name}")
+            args = text.split(" ")
+            result = None
+            cmd_name = args[0]
+            cmd_args = args[1:]
+            if cmd_name in self.commands:
+                command = self.commands[cmd_name](self.client, *cmd_args)
+                result = command()
+                print(command.output)
+            else:
+                print("Неизвестная команда")
+            if result:
+                return result
         elif text.rstrip(" "):
             return f"PRIVMSG {self.client.current_channel} :{text}"
 
