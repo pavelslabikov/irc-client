@@ -1,6 +1,6 @@
 import socket
 import re
-import app.const as const
+import irc_client.const as const
 import abc
 
 CODE_PAGES = {"cp1251", "koi8_r", "cp866", "mac_cyrillic", "iso8859_5"}

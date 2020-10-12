@@ -1,8 +1,7 @@
 import os
-from app import errors
-from app.client import Client
+from irc_client import errors, const
+from irc_client.client import Client
 from configparser import ConfigParser
-from app import const
 
 
 def get_config() -> ConfigParser:

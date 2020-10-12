@@ -1,8 +1,8 @@
 import socket
 import threading
-import app.const as const
-import app.commands as cmd
-import app.server_messages as msg
+import irc_client.const as const
+import irc_client.commands as cmd
+import irc_client.server_messages as msg
 from configparser import ConfigParser
 
 

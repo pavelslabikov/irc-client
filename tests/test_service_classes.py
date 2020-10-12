@@ -1,8 +1,7 @@
 import unittest
 import configparser
 import warnings
-from app import const
-from app import client as app
+from irc_client import client as app, const
 
 
 class TestResponseMethods(unittest.TestCase):
