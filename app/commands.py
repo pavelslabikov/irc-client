@@ -24,15 +24,17 @@ class ClientCommand(abc.ABC):
     def execute(self, *args):
         pass
 
-    def __call__(self):
+    def __call__(self) -> str:
         if self.validate_args():
-            return self.execute(*self._args)
+            execution_result = self.execute(*self._args)
+            return execution_result if execution_result else ""
+        return ""
 
 
 class JoinCommand(ClientCommand):
     usage = "/join CHANNEL [PASSWORD]"
 
-    def execute(self, ch_name: str, password=""):
+    def execute(self, ch_name: str, password="") -> str:
         ch_name = ch_name.lower()
         self._client.current_channel = ch_name
         self._client.joined_channels.add(ch_name)
@@ -77,13 +79,13 @@ class ChangeNickCommand(ClientCommand):
 class DisconnectCommand(ClientCommand):
     usage = "/quit"
 
-    def execute(self):  # TODO: Может быть эксепшн из-за отсутствия возвращаемого значения
+    def execute(self) -> None:  # TODO: Может быть эксепшн из-за отсутствия возвращаемого значения
         self._client.hostname = None
         self._client.is_connected = False
         self._client.joined_channels = set()
         self._client.current_channel = None
         self._client.sock.shutdown(socket.SHUT_WR)
-        self.output = f"Отключение от сервера"
+        self.output = f"Отключение от сервера..."
 
     def validate_args(self) -> bool:
         if not super().validate_args():
@@ -98,7 +100,7 @@ class DisconnectCommand(ClientCommand):
 class SwitchCommand(ClientCommand):
     usage = "/switch CHANNEL"
 
-    def execute(self, ch_name: str):
+    def execute(self, ch_name: str) -> None:
         ch_name = ch_name.lower()
         if ch_name in self._client.joined_channels and ch_name != self._client.current_channel:
             self.output = f"Переключение текущего канала на {ch_name}..."
@@ -126,7 +128,7 @@ class SwitchCommand(ClientCommand):
 class LeaveCommand(ClientCommand):
     usage = "/leave"
 
-    def execute(self):
+    def execute(self) -> str:
         ch_name = self._client.current_channel
         self._client.current_channel = None
         self._client.joined_channels.remove(ch_name)
@@ -150,7 +152,7 @@ class LeaveCommand(ClientCommand):
 class HelpCommand(ClientCommand):
     usage = "/help"
 
-    def execute(self):
+    def execute(self) -> None:
         self.output = const.HELP_MESSAGE
 
 
@@ -167,7 +169,7 @@ class ConnectCommand(ClientCommand):
             return False
         return True
 
-    def execute(self, hostname: str, port=6667):
+    def execute(self, hostname: str, port=6667) -> str:
         self._client.sock = socket.socket()
         self._client.sock.settimeout(10)
         try:
@@ -194,7 +196,7 @@ class ChangeCodePageCommand(ClientCommand):
             return False
         return True
 
-    def execute(self, code_page: str):
+    def execute(self, code_page: str) -> None:
         self.output = f"Текущая кодировка изменена на {code_page}"
         self._client.config["Settings"]["CodePage"] = code_page
 
@@ -202,7 +204,17 @@ class ChangeCodePageCommand(ClientCommand):
 class AddToFavCommand(ClientCommand):
     usage = "/add"
 
-    def execute(self):
+    def validate_args(self) -> bool:
+        if not super().validate_args():
+            return False
+
+        if not self._client.is_connected:
+            self.output = "Прежде чем вводить данную команду, подключитесь к серверу!"
+            return False
+
+        return True
+
+    def execute(self) -> None:
         self._client.config.set("Servers", self._client.hostname)
         self.output = f"Сервер {self._client.hostname} добавлен в список избранных"
 
@@ -254,3 +266,11 @@ class ExitCommand(ClientCommand):
             self._client.is_connected = False
             self._client.sock.shutdown(socket.SHUT_WR)
         exit()
+
+
+class UnknownCommand(ClientCommand):
+    def validate_args(self) -> bool:
+        return True
+
+    def execute(self, *args) -> None:
+        self.output = "Неизвестная команда!"

@@ -1,13 +1,9 @@
 import socket
 import threading
-import re
 import app.const as const
 import app.commands as cmd
+import app.server_messages as msg
 from configparser import ConfigParser
-
-MESSAGE_EXPR = re.compile(r":(?P<sender>[^\s!]+)(!.*)? (?P<command>PRIVMSG|NOTICE|\d{3}) (?P<target>.+) :(?P<text>.+)")
-NOTIFICATION_EXPR = re.compile(r":(?P<nick>[^\s!]+)!?\S+ (?P<command>JOIN|PART|NICK|MODE).* :?(?P<target>\S+)")
-SERVER_MSG_EXPR = re.compile(r":(?P<sender>\S+) (?P<command>\d{3}) \S+ (?P<text>.+) :")
 
 
 class Client:
@@ -35,24 +31,25 @@ class Client:
         input_thread.join()
 
     def wait_for_input(self) -> None:
-        parser = InputParser(self)
+        handler = CommandHandler(self)
         while self.is_working:
-            message = parser.parse_message(input(self.cmd_prompt)) + "\r\n"
+            message = handler.parse_input(input(self.cmd_prompt))
             if self.is_connected:
-                self.sock.sendall(message.encode(self.code_page))
+                self.sock.sendall(message)
 
     def wait_for_response(self) -> None:
+        parser = ResponseParser(self)
         while self.is_working:
             while self.is_connected:
                 data = self.sock.recv(const.BUFFER_SIZE)
-                print(Response(data, self.code_page))
+                print(parser.parse_response(data))
 
     def refresh_config(self) -> None:
         with open(const.CONFIG_PATH, "w") as file:
             self.config.write(file)
 
 
-class InputParser:
+class CommandHandler:
     def __init__(self, client: Client):
         self.client = client
         self.commands = {
@@ -72,55 +69,52 @@ class InputParser:
             "/switch": cmd.SwitchCommand
         }
 
-    def parse_message(self, text: str) -> str:
-        if text.startswith("/"):
-            args = text.split(" ")
-            result = None
-            cmd_name = args[0]
-            cmd_args = args[1:]
-            if cmd_name in self.commands:
-                command = self.commands[cmd_name](self.client, *cmd_args)
-                result = command()
-                print(command.output)
+    def get_command(self, line: str) -> cmd.ClientCommand:
+        args = line.split(" ")
+        command_name = args[0]
+        cmd_args = args[1:]
+        if command_name in self.commands:
+            return self.commands[command_name](self.client, *cmd_args)
+        return cmd.UnknownCommand(self.client, *cmd_args)
+
+    def parse_input(self, input_text: str) -> bytes:
+        text_to_send = bytearray()
+        if input_text.startswith("/"):
+            command = self.get_command(input_text)
+            text_to_send += command().encode(self.client.code_page) + b"\r\n"
+            print(command.output)
+        elif self.client.current_channel and input_text.rstrip(" "):
+            pm_command = self.get_command(f"/pm {self.client.current_channel} {input_text}")
+            text_to_send += pm_command().encode(self.client.code_page) + b"\r\n"
+        return text_to_send
+
+
+class ResponseParser:
+    def __init__(self, client: Client):
+        self.client = client
+        self.messages = {
+            "JOIN": msg.JoinMessage,
+            "PART": msg.PartMessage,
+            "NICK": msg.NickMessage,
+            "MODE": msg.ChangeModeMessage,
+            "PRIVMSG": msg.PrivateMessage,
+            "NOTICE": msg.NoticeMessage
+        }
+
+    def get_messages(self, decoded_data: str):
+        for line in decoded_data.split("\r\n"):
+            words = line.split(" ")
+            if len(words) < 2:
+                continue
+            command_name = words[1].upper()
+            if command_name in self.messages:
+                yield self.messages[command_name](line)
+            elif command_name.isdigit():
+                yield msg.ServiceMessage(line)
             else:
-                print("Неизвестная команда")
-            if result:
-                return result
-        elif text.rstrip(" "):
-            return f"PRIVMSG {self.client.current_channel} :{text}"
+                yield msg.UnresolvedMessage(line)
 
-        return ""
-
-
-class Response:
-    COMMAND_REPR = {
-        "JOIN": "joined",
-        "PART": "left",
-        "NICK": "is now known as",
-        "MODE": "sets mode:"
-    }
-
-    def __init__(self, raw_response: bytes, code_page: str):
-        self.decoded_data = raw_response.decode(code_page)
-
-    def __str__(self) -> str:
-        lines = self.decoded_data.split("\r\n")
-        result = []
-        for current_line in lines:
-            for expr in [MESSAGE_EXPR, NOTIFICATION_EXPR, SERVER_MSG_EXPR]:
-                match = expr.search(current_line)
-                if match:
-                    current_line = self.parse_match_obj(match, expr.pattern)
-                    break
-            result.append(current_line)
-        return "\r\n".join(result)
-
-    def parse_match_obj(self, expr: re.match, pattern: str) -> str:
-        groups = expr.groupdict()
-        if pattern == NOTIFICATION_EXPR.pattern:
-            return f"<{groups['nick']}> {self.COMMAND_REPR[groups['command']]} {groups['target']}"
-
-        if groups["command"] == "PRIVMSG":
-            return f"[{groups['target']}] <{groups['sender']}>: {groups['text']}"
-
-        return f"[{groups['sender']}] >> {groups['text']}"
+    def parse_response(self, data: bytes) -> str:
+        decoded_data = data.decode(self.client.code_page)
+        result = [str(message) for message in self.get_messages(decoded_data)]
+        return "\n".join(result)
