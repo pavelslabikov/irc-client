@@ -18,4 +18,4 @@ class ConfigNotFoundError(ApiError):
         self.arg = path
 
     def __str__(self):
-        return f"Не удалось найти конфигурационный файл - config.ini по пути: {self.arg}"
+        return f"Не удалось найти конфигурационный файл config.ini в рабочей директории - {self.arg}"

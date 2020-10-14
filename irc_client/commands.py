@@ -2,8 +2,10 @@ import socket
 import re
 import irc_client.const as const
 import abc
+import logging
 
 CODE_PAGES = {"cp1251", "koi8_r", "cp866", "mac_cyrillic", "iso8859_5"}
+logger = logging.getLogger(__name__)
 
 
 class ClientCommand(abc.ABC):
@@ -79,7 +81,7 @@ class ChangeNickCommand(ClientCommand):
 class DisconnectCommand(ClientCommand):
     usage = "/quit"
 
-    def execute(self) -> None:  # TODO: Может быть эксепшн из-за отсутствия возвращаемого значения
+    def execute(self) -> None:
         self._client.hostname = None
         self._client.is_connected = False
         self._client.joined_channels = set()
@@ -173,10 +175,13 @@ class ConnectCommand(ClientCommand):
         self._client.sock = socket.socket()
         self._client.sock.settimeout(10)
         try:
+            logger.info(f"Trying to connect to {hostname} with port {port}...")
             self._client.sock.connect((hostname, port))
-        except socket.gaierror:
+        except socket.gaierror as e:
+            logger.info(f"Failed to connect with reason - {str(e)}")
             self.output = f"Не удалось подключиться по заданному адресу: {hostname}"
             return ""
+        logger.info("Successfully connected to server.")
         self._client.sock.settimeout(None)
         self._client.hostname = hostname
         self._client.is_connected = True
@@ -260,6 +265,7 @@ class ExitCommand(ClientCommand):
     usage = "/exit"
 
     def execute(self) -> None:
+        logger.info("Exiting application")
         self._client.refresh_config()
         self._client.is_working = False
         if self._client.is_connected:
@@ -274,3 +280,11 @@ class UnknownCommand(ClientCommand):
 
     def execute(self, *args) -> None:
         self.output = "Неизвестная команда!"
+
+
+class Info(ClientCommand):
+    def validate_args(self) -> bool:
+        return True
+
+    def execute(self, name: str, m: str) -> str:
+        return f"KNOCK {name} {m}"

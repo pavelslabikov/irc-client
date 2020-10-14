@@ -20,7 +20,7 @@ class ServerMessage(abc.ABC):
 
 
 class JoinMessage(ServerMessage):
-    expr = re.compile(r":(?P<nick>[^\s!]+)!?\S+ JOIN.* :?(?P<channel>\S+)")
+    expr = re.compile(r":(?P<nick>[^\s!]+)!?\S+ JOIN :?(?P<channel>\S+)")
 
     def parse_from_str(self, match) -> str:
         nickname = match.groupdict()["nick"]
@@ -29,7 +29,7 @@ class JoinMessage(ServerMessage):
 
 
 class PartMessage(ServerMessage):
-    expr = re.compile(r":(?P<nick>[^\s!]+)!?\S+ PART.* :?(?P<channel>\S+)")
+    expr = re.compile(r":(?P<nick>[^\s!]+)!?\S+ PART :?(?P<channel>\S+)")
 
     def parse_from_str(self, match) -> str:
         nickname = match.groupdict()["nick"]
@@ -57,16 +57,20 @@ class PrivateMessage(ServerMessage):
 
 
 class ChangeModeMessage(ServerMessage):
-    expr = re.compile(r":(?P<nick>[^\s!]+)!?\S+ MODE.* :?(?P<mode>\S+)")  # TODO сменить регулярку
+    expr = re.compile(r":(?P<nick>[^\s!]+)!?\S+ MODE (?P<target>.+) :?(?P<mode>\S+)")  # TODO сменить регулярку
 
     def parse_from_str(self, match) -> str:
         nickname = match.groupdict()["nick"]
+        target = match.groupdict()["target"]
         new_mode = match.groupdict()["mode"]
-        return f"{nickname} сменил мод на {new_mode}"
+        if target == nickname:
+            return f"{nickname} сменил свой флаг на {new_mode}"
+
+        return f"{nickname} установил для {target} флаг {new_mode}"
 
 
 class ServiceMessage(ServerMessage):
-    expr = re.compile(r":(?P<sender>[^\s!]+)(!.*)? \d{3} .+ :(?P<text>.+)")  # TODO: сменить регулярку
+    expr = re.compile(r":(?P<sender>[^\s!]+)(!.*)? \d{3} \S+ :?(?P<text>.+)")  # TODO: чинить регулярку для /list
 
     def parse_from_str(self, match) -> str:
         sender = match.groupdict()["sender"]

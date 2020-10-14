@@ -1,9 +1,12 @@
 import socket
 import threading
+import logging
 import irc_client.const as const
 import irc_client.commands as cmd
 import irc_client.server_messages as msg
 from configparser import ConfigParser
+
+logger = logging.getLogger(__name__)
 
 
 class Client:
@@ -45,6 +48,7 @@ class Client:
                 print(parser.parse_response(data))
 
     def refresh_config(self) -> None:
+        logger.debug(f"Trying to refresh config by path: {const.CONFIG_PATH}")
         with open(const.CONFIG_PATH, "w") as file:
             self.config.write(file)
 
@@ -66,7 +70,8 @@ class CommandHandler:
             "/names": cmd.ShowNamesCommand,
             "/leave": cmd.LeaveCommand,
             "/quit": cmd.DisconnectCommand,
-            "/switch": cmd.SwitchCommand
+            "/switch": cmd.SwitchCommand,
+            "/knock": cmd.Info
         }
 
     def get_command(self, line: str) -> cmd.ClientCommand:
@@ -75,6 +80,7 @@ class CommandHandler:
         cmd_args = args[1:]
         if command_name in self.commands:
             return self.commands[command_name](self.client, *cmd_args)
+        logger.debug(f"Cannot parse command: {command_name}")
         return cmd.UnknownCommand(self.client, *cmd_args)
 
     def parse_input(self, input_text: str) -> bytes:
@@ -83,6 +89,7 @@ class CommandHandler:
             command = self.get_command(input_text)
             text_to_send += command().encode(self.client.code_page) + b"\r\n"
             print(command.output)
+
         elif self.client.current_channel and input_text.rstrip(" "):
             pm_command = self.get_command(f"/pm {self.client.current_channel} {input_text}")
             text_to_send += pm_command().encode(self.client.code_page) + b"\r\n"
@@ -112,6 +119,7 @@ class ResponseParser:
             elif command_name.isdigit():
                 yield msg.ServiceMessage(line)
             else:
+                logger.debug(f"Received unresolved message: {line}")
                 yield msg.UnresolvedMessage(line)
 
     def parse_response(self, data: bytes) -> str:
