@@ -4,16 +4,16 @@ import logging
 import irc_client.const as const
 import irc_client.commands as cmd
 import irc_client.server_messages as msg
-from configparser import ConfigParser
 
 logger = logging.getLogger(__name__)
 
 
 class Client:
-    def __init__(self, config: ConfigParser, nickname: str, code_page: str):
+    def __init__(self, nickname: str, code_page: str, favourites: set):
         self.sock = socket.socket()
-        self.config = config
+        self.favourites = favourites
         self.nickname = nickname
+        self.prev_nick = nickname
         self.code_page = code_page
         self.hostname = None
         self.joined_channels = set()
@@ -47,11 +47,6 @@ class Client:
                 data = self.sock.recv(const.BUFFER_SIZE)
                 print(parser.parse_response(data))
 
-    def refresh_config(self) -> None:
-        logger.debug(f"Trying to refresh config by path: {const.CONFIG_PATH}")
-        with open(const.CONFIG_PATH, "w") as file:
-            self.config.write(file)
-
 
 class CommandHandler:
     def __init__(self, client: Client):
@@ -71,7 +66,6 @@ class CommandHandler:
             "/leave": cmd.LeaveCommand,
             "/quit": cmd.DisconnectCommand,
             "/switch": cmd.SwitchCommand,
-            "/knock": cmd.Info
         }
 
     def get_command(self, line: str) -> cmd.ClientCommand:
@@ -88,7 +82,8 @@ class CommandHandler:
         if input_text.startswith("/"):
             command = self.get_command(input_text)
             text_to_send += command().encode(self.client.code_page) + b"\r\n"
-            print(command.output)
+            if command.output:
+                print(command.output)
 
         elif self.client.current_channel and input_text.rstrip(" "):
             pm_command = self.get_command(f"/pm {self.client.current_channel} {input_text}")
@@ -112,15 +107,16 @@ class ResponseParser:
         for line in decoded_data.split("\r\n"):
             words = line.split(" ")
             if len(words) < 2:
+                logger.debug(f"Received too short message: {line}")
                 continue
             command_name = words[1].upper()
             if command_name in self.messages:
-                yield self.messages[command_name](line)
+                yield self.messages[command_name](self.client, line)
             elif command_name.isdigit():
-                yield msg.ServiceMessage(line)
+                yield msg.ServiceMessage(self.client, line)
             else:
                 logger.debug(f"Received unresolved message: {line}")
-                yield msg.UnresolvedMessage(line)
+                continue
 
     def parse_response(self, data: bytes) -> str:
         decoded_data = data.decode(self.client.code_page)

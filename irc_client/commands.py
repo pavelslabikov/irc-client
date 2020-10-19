@@ -14,7 +14,7 @@ class ClientCommand(abc.ABC):
     def __init__(self, client, *args):
         self._client = client
         self._args = args
-        self.output = ""
+        self.output = None
 
     def validate_args(self) -> bool:
         if len(self._args) + 1 != len(self.usage.split(" ")):
@@ -63,7 +63,7 @@ class ChangeNickCommand(ClientCommand):
     usage = "/nick NICKNAME"
 
     def execute(self, new_nickname: str) -> str:
-        self._client.config["Settings"]["nickname"] = new_nickname
+        self._client.prev_nick = self._client.nickname
         self._client.nickname = new_nickname
         return f"NICK {new_nickname}"
 
@@ -202,8 +202,8 @@ class ChangeCodePageCommand(ClientCommand):
         return True
 
     def execute(self, code_page: str) -> None:
+        self._client.code_page = code_page
         self.output = f"Текущая кодировка изменена на {code_page}"
-        self._client.config["Settings"]["CodePage"] = code_page
 
 
 class AddToFavCommand(ClientCommand):
@@ -220,7 +220,7 @@ class AddToFavCommand(ClientCommand):
         return True
 
     def execute(self) -> None:
-        self._client.config.set("Servers", self._client.hostname)
+        self._client.favourites.add(self._client.hostname)
         self.output = f"Сервер {self._client.hostname} добавлен в список избранных"
 
 
@@ -229,7 +229,7 @@ class ShowFavCommand(ClientCommand):
 
     def execute(self) -> None:
         servers = []
-        for server, value in self._client.config.items("Servers"):
+        for server in self._client.favourites:
             servers.append(server)
         self.output = "Список серверов в избранном:\n" + "\n".join(servers)
 
@@ -266,12 +266,10 @@ class ExitCommand(ClientCommand):
 
     def execute(self) -> None:
         logger.info("Exiting application")
-        self._client.refresh_config()
         self._client.is_working = False
         if self._client.is_connected:
             self._client.is_connected = False
             self._client.sock.shutdown(socket.SHUT_WR)
-        exit()
 
 
 class UnknownCommand(ClientCommand):
@@ -280,11 +278,3 @@ class UnknownCommand(ClientCommand):
 
     def execute(self, *args) -> None:
         self.output = "Неизвестная команда!"
-
-
-class Info(ClientCommand):
-    def validate_args(self) -> bool:
-        return True
-
-    def execute(self, name: str, m: str) -> str:
-        return f"KNOCK {name} {m}"

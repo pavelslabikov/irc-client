@@ -20,13 +20,24 @@ def get_config() -> ConfigParser:
     return current_config
 
 
+def refresh_config() -> None:
+    config["Settings"]["nickname"] = client.nickname
+    config["Settings"]["codepage"] = client.code_page
+    for server in client.favourites:
+        config.set("Servers", server)
+
+    with open(const.CONFIG_PATH, "w") as file:
+        config.write(file)
+
+
 if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     try:
         config = get_config()
-        client = Client(config, config["Settings"]["nickname"], config["Settings"]["codepage"])
+        client = Client(config["Settings"]["nickname"], config["Settings"]["codepage"], set(config["Servers"].keys()))
         logger.info("Starting client...")
         client.start_client()
+        refresh_config()
     except errors.ApiError as e:
         logger.error(f"Client exception caught - {str(e)}")
     except Exception as e:

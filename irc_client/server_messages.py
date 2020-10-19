@@ -5,7 +5,8 @@ import re
 class ServerMessage(abc.ABC):
     expr = re.compile("")
 
-    def __init__(self, raw_message: str):
+    def __init__(self, client, raw_message: str):
+        self._client = client
         self.raw_message = raw_message
 
     @abc.abstractmethod
@@ -57,7 +58,7 @@ class PrivateMessage(ServerMessage):
 
 
 class ChangeModeMessage(ServerMessage):
-    expr = re.compile(r":(?P<nick>[^\s!]+)!?\S+ MODE (?P<target>.+) :?(?P<mode>\S+)")  # TODO сменить регулярку
+    expr = re.compile(r":(?P<nick>\S+) MODE (?P<target>.+) :?(?P<mode>\S+)")
 
     def parse_from_str(self, match) -> str:
         nickname = match.groupdict()["nick"]
@@ -70,27 +71,30 @@ class ChangeModeMessage(ServerMessage):
 
 
 class ServiceMessage(ServerMessage):
-    expr = re.compile(r":(?P<sender>[^\s!]+)(!.*)? \d{3} \S+ :?(?P<text>.+)")  # TODO: чинить регулярку для /list
+    expr = re.compile(r":(?P<sender>[^\s!]+)(!.*)? (?P<code>\d{3}) \S+ :?(?P<text>.+)")
+    CHAN_ERRORS = {442, 470, 471, 473, 474, 475, 477, 478}
+    NICK_ERROR = 433
 
     def parse_from_str(self, match) -> str:
         sender = match.groupdict()["sender"]
         text = match.groupdict()["text"]
+        response_code = int(match.groupdict()["code"])
+
+        if response_code in self.CHAN_ERRORS:
+            curr_channel = self._client.current_channel
+            if curr_channel in self._client.joined_channels:
+                self._client.joined_channels.remove(curr_channel)
+            self._client.current_channel = None
+
+        if response_code == self.NICK_ERROR:
+            self._client.nickname = self._client.prev_nick
         return f"[{sender}] >> {text}"
 
 
 class NickMessage(ServerMessage):
-    expr = re.compile(r":(?P<nick>[^\s!]+)!?\S+ NAME.* :?(?P<new_nick>\S+)")
+    expr = re.compile(r":(?P<nick>[^\s!]+)!?\S+ NICK.* :?(?P<new_nick>\S+)")
 
     def parse_from_str(self, match) -> str:
         nickname = match.groupdict()["nick"]
         new_nickname = match.groupdict()["new_nick"]
         return f"{nickname} сменил ник на {new_nickname}"
-
-
-class UnresolvedMessage(ServerMessage):
-    def parse_from_str(self, match) -> str:
-        pass
-
-    def __str__(self):
-        return self.raw_message
-
