@@ -9,12 +9,12 @@ logger = logging.getLogger(__name__)
 
 
 class Client:
-    def __init__(self, nickname: str, code_page: str, favourites: set):
+    def __init__(self, nickname: str, encoding: str, favourites: set):
         self.sock = socket.socket()
         self.favourites = favourites
         self.nickname = nickname
         self.prev_nick = nickname
-        self.code_page = code_page
+        self.code_page = encoding
         self.hostname = None
         self.joined_channels = set()
         self.current_channel = None

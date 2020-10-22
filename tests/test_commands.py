@@ -26,6 +26,8 @@ def test_command_handler(tested_handler, test_input: str, expected_command: Clie
         (com.JoinCommand, "JOIN &test pass\r\n", ("&test", "pass")),
         (com.NickCommand, "NICK new_nickname1\r\n", ("new_nickname1",)),
         (com.ConnectCommand, "", ("irc.ircnet.su", "6667")),
+        (com.ListCommand, "LIST\r\n", ()),
+        (com.PrivateMessageCommand, "PRIVMSG #channel :test text\r\n", ("#channel", "test", "text"))
     ]
 )
 def test_command_execution(tested_client, command_type, expected_result: str, args: tuple):
@@ -40,7 +42,9 @@ def test_command_execution(tested_client, command_type, expected_result: str, ar
         (com.ConnectCommand, "Вы уже подключены", ("irc.ircnet.su", "6667")),
         (com.NickCommand, "Недопустимый никнейм", ("!@^&$%",)),
         (com.AddToFavCommand, "Сервер test_server добавлен", ()),
-        (com.CodePageCommand, "Допустимые кодировки:", ("cp1255",))
+        (com.CodePageCommand, "Допустимые кодировки:", ("cp1255",)),
+        (com.PartCommand, "Вы не присоединены", ()),
+        (com.SwitchCommand, "Вы не присоединены", ("#Channel",))
     ]
 )
 def test_command_output(tested_client, command_type, expected_output: str, args: tuple):
