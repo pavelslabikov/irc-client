@@ -5,7 +5,7 @@ from irc_client.client import Client
 from configparser import ConfigParser
 
 logging.basicConfig(format="[%(levelname)s]: %(asctime)s | in %(name)s | %(message)s",
-                    level=logging.DEBUG)
+                    level=logging.ERROR)
 
 
 def get_config() -> ConfigParser:
@@ -34,7 +34,9 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     try:
         config = get_config()
-        client = Client(config["Settings"]["nickname"], config["Settings"]["codepage"], set(config["Servers"].keys()))
+        client = Client(config["Settings"]["nickname"],
+                        config["Settings"]["codepage"],
+                        set(config["Servers"].keys()))
         logger.info("Starting client...")
         client.start_client()
         refresh_config()

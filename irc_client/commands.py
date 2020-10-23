@@ -4,7 +4,6 @@ import irc_client.const as const
 import abc
 import logging
 
-CODE_PAGES = {"cp1251", "koi8_r", "cp866", "mac_cyrillic", "iso8859_5"}
 logger = logging.getLogger(__name__)
 
 
@@ -28,9 +27,60 @@ class ClientCommand(abc.ABC):
 
     def __call__(self) -> str:
         if self.validate_args():
-            execution_result = self.execute(*self._args)
-            return execution_result if execution_result else ""
+            result = self.execute(*self._args)
+            return result + "\r\n" if result else ""
         return ""
+
+
+class PartCommand(ClientCommand):
+    usage = "/leave"
+
+    def execute(self) -> str:
+        ch_name = self._client.current_channel
+        self._client.current_channel = None
+        self._client.joined_channels.remove(ch_name)
+        return f"PART {ch_name}"
+
+    def validate_args(self) -> bool:
+        if not super().validate_args():
+            return False
+
+        if not self._client.is_connected:
+            self.output = "Прежде чем вводить данную команду, подключитесь к серверу!"
+            return False
+
+        ch_name = self._client.current_channel
+        if ch_name not in self._client.joined_channels:
+            self.output = f"Вы не присоединены ни к одному каналу!"
+            return False
+        return True
+
+
+class ListCommand(ClientCommand):
+    usage = "/list"
+
+    def execute(self) -> str:
+        return "LIST"
+
+
+class NamesCommand(ClientCommand):
+    usage = "/names"
+
+    def execute(self) -> str:
+        return f"NAMES {self._client.current_channel}"
+
+
+class PrivateMessageCommand(ClientCommand):
+    usage = "/pm TARGET TEXT"
+
+    def validate_args(self) -> bool:
+        if len(self._args) < 2:
+            self.output = f"Неверное количество аргументов для команды!\nИспользуйте: {self.usage}"
+            return False
+        return True
+
+    def execute(self, target: str, *message) -> str:
+        return f"PRIVMSG {target} :{' '.join(message)}"
 
 
 class JoinCommand(ClientCommand):
@@ -58,7 +108,7 @@ class JoinCommand(ClientCommand):
         return True
 
 
-class ChangeNickCommand(ClientCommand):
+class NickCommand(ClientCommand):
     NICK_EXPR = re.compile(r"^[a-zA-Zа-я-А-Я][\w]+")
     usage = "/nick NICKNAME"
 
@@ -127,30 +177,6 @@ class SwitchCommand(ClientCommand):
         return True
 
 
-class LeaveCommand(ClientCommand):
-    usage = "/leave"
-
-    def execute(self) -> str:
-        ch_name = self._client.current_channel
-        self._client.current_channel = None
-        self._client.joined_channels.remove(ch_name)
-        return f"PART {ch_name}"
-
-    def validate_args(self) -> bool:
-        if not super().validate_args():
-            return False
-
-        if not self._client.is_connected:
-            self.output = "Прежде чем вводить данную команду, подключитесь к серверу!"
-            return False
-
-        ch_name = self._client.current_channel
-        if ch_name not in self._client.joined_channels:
-            self.output = f"Вы не присоединены ни к одному каналу!"
-            return False
-        return True
-
-
 class HelpCommand(ClientCommand):
     usage = "/help"
 
@@ -178,9 +204,10 @@ class ConnectCommand(ClientCommand):
             logger.info(f"Trying to connect to {hostname} with port {port}...")
             self._client.sock.connect((hostname, port))
         except socket.gaierror as e:
-            logger.info(f"Failed to connect with reason - {str(e)}")
+            logger.info(f"Failed to connect by reason - {str(e)}")
             self.output = f"Не удалось подключиться по заданному адресу: {hostname}"
             return ""
+
         logger.info("Successfully connected to server.")
         self._client.sock.settimeout(None)
         self._client.hostname = hostname
@@ -188,16 +215,16 @@ class ConnectCommand(ClientCommand):
         return f"NICK {self._client.nickname}\r\nUSER 1 1 1 1"
 
 
-class ChangeCodePageCommand(ClientCommand):
-    usage = "/chcp CODE_PAGE"
+class CodePageCommand(ClientCommand):
+    usage = "/chcp ENCODING"
 
     def validate_args(self) -> bool:
         if not super().validate_args():
             return False
 
         code_page = self._args[0].lower()
-        if code_page not in CODE_PAGES:
-            self.output = f"Допустимые кодировки: {CODE_PAGES}"
+        if code_page not in const.CODE_PAGES:
+            self.output = f"Допустимые кодировки: {const.CODE_PAGES}"
             return False
         return True
 
@@ -234,33 +261,6 @@ class ShowFavCommand(ClientCommand):
         self.output = "Список серверов в избранном:\n" + "\n".join(servers)
 
 
-class ShowChannelsCommand(ClientCommand):
-    usage = "/list"
-
-    def execute(self) -> str:
-        return "LIST"
-
-
-class PrivateMessageCommand(ClientCommand):
-    usage = "/pm TARGET TEXT"
-
-    def validate_args(self) -> bool:
-        if len(self._args) < 2:
-            self.output = f"Неверное количество аргументов для команды!\nИспользуйте: {self.usage}"
-            return False
-        return True
-
-    def execute(self, target: str, *message) -> str:
-        return f"PRIVMSG {target} :{' '.join(message)}"
-
-
-class ShowNamesCommand(ClientCommand):
-    usage = "/names"
-
-    def execute(self) -> str:
-        return f"NAMES {self._client.current_channel}"
-
-
 class ExitCommand(ClientCommand):
     usage = "/exit"
 
@@ -277,4 +277,4 @@ class UnknownCommand(ClientCommand):
         return True
 
     def execute(self, *args) -> None:
-        self.output = "Неизвестная команда!"
+        pass

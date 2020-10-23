@@ -2,7 +2,7 @@ import socket
 import threading
 import logging
 import irc_client.const as const
-import irc_client.commands as cmd
+import irc_client.commands as com
 import irc_client.server_messages as msg
 
 logger = logging.getLogger(__name__)
@@ -36,69 +36,64 @@ class Client:
     def wait_for_input(self) -> None:
         handler = CommandHandler(self)
         while self.is_working:
-            message = handler.parse_input(input(self.cmd_prompt))
+            command = handler.get_command(input(self.cmd_prompt))
+            execution_result = command().encode(self.code_page)
             if self.is_connected:
-                self.sock.sendall(message)
+                self.sock.sendall(execution_result)
+            if command.output:
+                print(command.output)
 
     def wait_for_response(self) -> None:
-        parser = ResponseParser(self)
+        handler = MessageHandler(self)
         while self.is_working:
             while self.is_connected:
                 data = self.sock.recv(const.BUFFER_SIZE)
-                print(parser.parse_response(data))
+                print(handler.parse_response(data))
 
 
 class CommandHandler:
     def __init__(self, client: Client):
         self.client = client
         self.commands = {
-            "/chcp": cmd.ChangeCodePageCommand,
-            "/nick": cmd.ChangeNickCommand,
-            "/help": cmd.HelpCommand,
-            "/fav": cmd.ShowFavCommand,
-            "/server": cmd.ConnectCommand,
-            "/exit": cmd.ExitCommand,
-            "/pm": cmd.PrivateMessageCommand,
-            "/add": cmd.AddToFavCommand,
-            "/join": cmd.JoinCommand,
-            "/list": cmd.ShowChannelsCommand,
-            "/names": cmd.ShowNamesCommand,
-            "/leave": cmd.LeaveCommand,
-            "/quit": cmd.DisconnectCommand,
-            "/switch": cmd.SwitchCommand,
+            "/chcp": com.CodePageCommand,
+            "/nick": com.NickCommand,
+            "/help": com.HelpCommand,
+            "/fav": com.ShowFavCommand,
+            "/server": com.ConnectCommand,
+            "/exit": com.ExitCommand,
+            "/pm": com.PrivateMessageCommand,
+            "/add": com.AddToFavCommand,
+            "/join": com.JoinCommand,
+            "/list": com.ListCommand,
+            "/names": com.NamesCommand,
+            "/leave": com.PartCommand,
+            "/quit": com.DisconnectCommand,
+            "/switch": com.SwitchCommand,
         }
 
-    def get_command(self, line: str) -> cmd.ClientCommand:
-        args = line.split(" ")
-        command_name = args[0]
-        cmd_args = args[1:]
-        if command_name in self.commands:
-            return self.commands[command_name](self.client, *cmd_args)
-        logger.debug(f"Cannot parse command: {command_name}")
-        return cmd.UnknownCommand(self.client, *cmd_args)
-
-    def parse_input(self, input_text: str) -> bytes:
-        text_to_send = bytearray()
+    def get_command(self, input_text: str) -> com.ClientCommand:
         if input_text.startswith("/"):
-            command = self.get_command(input_text)
-            text_to_send += command().encode(self.client.code_page) + b"\r\n"
-            if command.output:
-                print(command.output)
+            command_parts = input_text.split(" ")
+            command_name = command_parts[0]
+            command_args = command_parts[1:]
+            if command_name in self.commands:
+                return self.commands[command_name](self.client, *command_args)
 
         elif self.client.current_channel and input_text.rstrip(" "):
-            pm_command = self.get_command(f"/pm {self.client.current_channel} {input_text}")
-            text_to_send += pm_command().encode(self.client.code_page) + b"\r\n"
-        return text_to_send
+            return com.PrivateMessageCommand(self.client, self.client.current_channel, *input_text.split(" "))
+
+        logger.debug(f"Cannot parse command: {input_text}")
+        return com.UnknownCommand(self.client)
 
 
-class ResponseParser:
+class MessageHandler:
     def __init__(self, client: Client):
         self.client = client
         self.messages = {
             "JOIN": msg.JoinMessage,
             "PART": msg.PartMessage,
             "NICK": msg.NickMessage,
-            "MODE": msg.ChangeModeMessage,
+            "MODE": msg.ModeMessage,
             "PRIVMSG": msg.PrivateMessage,
             "NOTICE": msg.NoticeMessage
         }
@@ -117,6 +112,7 @@ class ResponseParser:
             else:
                 logger.debug(f"Received unresolved message: {line}")
                 continue
+        return ""
 
     def parse_response(self, data: bytes) -> str:
         decoded_data = data.decode(self.client.code_page)

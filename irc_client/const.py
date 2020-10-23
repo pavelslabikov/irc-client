@@ -12,11 +12,8 @@ HELP_MESSAGE = "| /add | Добавить текущий сервер в спи�
 | /switch CHANNEL | Переключить активный канал на CHANNEL (должны быть присоединены к нему). |\n\
 | /exit | Выход из приложения. |"
 
-DEFAULT_CONFIG = {
-    "Settings": {"nickname": "undefined", "codepage": "cp1251"},
-    "Servers": {}
-}
-
 CONFIG_PATH = "config.ini"
 
 BUFFER_SIZE = 4096
+
+CODE_PAGES = {"cp1251", "koi8_r", "cp866", "mac_cyrillic", "iso8859_5"}
