@@ -20,6 +20,7 @@ class Client:
         self.current_channel = None
         self.is_connected = False
         self.is_working = True
+        self.command_handler = CommandHandler(self)
 
     @property
     def cmd_prompt(self):
@@ -34,9 +35,8 @@ class Client:
         input_thread.join()
 
     def wait_for_input(self) -> None:
-        handler = CommandHandler(self)
         while self.is_working:
-            command = handler.get_command(input(self.cmd_prompt))
+            command = self.command_handler.get_command(input(self.cmd_prompt))
             execution_result = command().encode(self.code_page)
             if self.is_connected:
                 self.sock.sendall(execution_result)
@@ -53,7 +53,7 @@ class Client:
 
 class CommandHandler:
     def __init__(self, client: Client):
-        self.client = client
+        self._client = client
         self.commands = {
             "/chcp": com.CodePageCommand,
             "/nick": com.NickCommand,
@@ -77,13 +77,13 @@ class CommandHandler:
             command_name = command_parts[0]
             command_args = command_parts[1:]
             if command_name in self.commands:
-                return self.commands[command_name](self.client, *command_args)
+                return self.commands[command_name](self._client, *command_args)
 
-        elif self.client.current_channel and input_text.rstrip(" "):
-            return com.PrivateMessageCommand(self.client, self.client.current_channel, *input_text.split(" "))
+        elif self._client.current_channel and input_text.rstrip(" "):
+            return com.PrivateMessageCommand(self._client, self._client.current_channel, *input_text.split(" "))
 
         logger.debug(f"Cannot parse command: {input_text}")
-        return com.UnknownCommand(self.client)
+        return com.UnknownCommand(self._client)
 
 
 class MessageHandler:
