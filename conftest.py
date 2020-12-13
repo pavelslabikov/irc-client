@@ -1,11 +1,13 @@
 import pytest
-import irc_client.commands as com
-from irc_client.client import CommandHandler, Client, MessageHandler
+import irc.commands as com
+from irc.client import Client
+from irc.handlers import CommandHandler, MessageHandler
+from irc.cli.view import CliView
 
 
 @pytest.fixture()
 def tested_client() -> Client:
-    client = Client("TestName", "cp866", set("fav_server"))
+    client = Client("TestName", "cp866", set("fav_server"), CliView())
     client.is_connected = True
     client.hostname = "test_server"
     return client
@@ -13,7 +15,7 @@ def tested_client() -> Client:
 
 @pytest.fixture()
 def network_client() -> Client:
-    client = Client("TestName", "cp866", set())
+    client = Client("TestName", "cp866", set(), CliView())
     yield client
     com.ExitCommand(client)
 

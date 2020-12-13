@@ -1,6 +1,6 @@
 import pytest
-import irc_client.server_messages as msg
-import irc_client.commands as com
+import irc.server_messages as msg
+import irc.commands as com
 
 
 @pytest.mark.parametrize(

@@ -1,23 +1,20 @@
-import os
 import logging
-from irc_client import errors, const
-from irc_client.client import Client
-from configparser import ConfigParser
+import threading
 
-logging.basicConfig(format="[%(levelname)s]: %(asctime)s | in %(name)s | %(message)s",
-                    level=logging.ERROR)
+from irc.config import ClientConfig
+from irc import errors, const
+from irc.client import Client
+from irc.cli.view import CliView
+
+logging.basicConfig(level=logging.DEBUG)
 
 
-def get_config() -> ConfigParser:
-    current_config = ConfigParser(allow_no_value=True)
-    if not os.path.exists(const.CONFIG_PATH):
-        raise errors.ConfigNotFoundError(os.getcwd())
-
-    current_config.read(const.CONFIG_PATH)
-    if not current_config.has_section("Settings") or not current_config.has_section("Servers"):
-        raise errors.InvalidConfigError(current_config)
-
-    return current_config
+def start_client():
+    input_thread = threading.Thread(target=client.wait_for_response)
+    input_thread.start()
+    while client.is_working:
+        client.process_user_input(input())
+    input_thread.join()
 
 
 def refresh_config() -> None:
@@ -33,12 +30,13 @@ def refresh_config() -> None:
 if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     try:
-        config = get_config()
+        config = ClientConfig.get_from_file(const.CONFIG_PATH)
         client = Client(config["Settings"]["nickname"],
                         config["Settings"]["codepage"],
-                        set(config["Servers"].keys()))
+                        set(config["Servers"].keys()),
+                        CliView())
         logger.info("Starting client...")
-        client.start_client()
+        start_client()
         refresh_config()
     except errors.ApiError as e:
         logger.error(f"Client exception caught - {str(e)}")
@@ -46,3 +44,4 @@ if __name__ == "__main__":
         logger.exception(f"Caught exception of type - {type(e)}:")
     finally:
         exit()
+

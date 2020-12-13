@@ -1,5 +1,5 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
-from irc_client.client import Client
+from irc.client import Client
 
 
 class ClientTab(QtWidgets.QWidget):

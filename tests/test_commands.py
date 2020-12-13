@@ -1,6 +1,6 @@
 import pytest
-from irc_client.commands import ClientCommand
-import irc_client.commands as com
+from irc.commands import ClientCommand
+import irc.commands as com
 
 
 @pytest.mark.parametrize(
@@ -11,7 +11,8 @@ import irc_client.commands as com
         ("/12345", com.UnknownCommand),
         ("/switch channel", com.SwitchCommand),
         ("/pm nick long test text", com.PrivateMessageCommand),
-        ("/join #channel pass", com.JoinCommand)
+        ("/join #channel pass", com.JoinCommand),
+        ("/chcp utf-8", com.CodePageCommand)
     ]
 )
 def test_command_handler(tested_handler, test_input: str, expected_command: ClientCommand):
@@ -44,7 +45,9 @@ def test_command_execution(tested_client, command_type, expected_result: str, ar
         (com.AddToFavCommand, "Сервер test_server добавлен", ()),
         (com.CodePageCommand, "Допустимые кодировки:", ("cp1255",)),
         (com.PartCommand, "Вы не присоединены", ()),
-        (com.SwitchCommand, "Вы не присоединены", ("#Channel",))
+        (com.SwitchCommand, "Вы не присоединены", ("#Channel",)),
+        (com.HelpCommand, "| /add |", ()),
+        (com.ShowFavCommand, "Список серверов", ())
     ]
 )
 def test_command_output(tested_client, command_type, expected_output: str, args: tuple):

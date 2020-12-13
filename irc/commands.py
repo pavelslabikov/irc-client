@@ -1,6 +1,6 @@
 import socket
 import re
-import irc_client.const as const
+import irc.const as const
 import abc
 import logging
 
