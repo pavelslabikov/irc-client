@@ -1,5 +1,5 @@
 from irc.view import BaseView
-from irc.server_messages import ServerMessage
+from irc.messages import ServerMessage
 
 
 class CliView(BaseView):
@@ -7,6 +7,9 @@ class CliView(BaseView):
         if message:
             print(message)
 
-    def display_text(self, text: str):
+    def display_chat_text(self, text: str):
         if text:
             print(text)
+
+    def display_channel(self, channel: str):
+        pass

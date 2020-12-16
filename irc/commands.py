@@ -1,10 +1,15 @@
 import socket
 import re
-import irc.const as const
 import abc
 import logging
 
+from irc import const
+
+
 logger = logging.getLogger(__name__)
+
+ERR_ARGS_AMOUNT = "Неверное кол-во аргументов для команды\nИспользуйте: "
+ERR_NOT_CONNECTED = "Сначала подключитесь к серверу"
 
 
 class ClientCommand(abc.ABC):
@@ -17,7 +22,7 @@ class ClientCommand(abc.ABC):
 
     def validate_args(self) -> bool:
         if len(self._args) + 1 != len(self.usage.split(" ")):
-            self.output = f"Неверное количество аргументов для команды!\nИспользуйте: {self.usage}"
+            self.output = ERR_ARGS_AMOUNT + self.usage
             return False
         return True
 
@@ -46,12 +51,12 @@ class PartCommand(ClientCommand):
             return False
 
         if not self._client.is_connected:
-            self.output = "Прежде чем вводить данную команду, подключитесь к серверу!"
+            self.output = ERR_NOT_CONNECTED
             return False
 
         ch_name = self._client.current_channel
         if ch_name not in self._client.joined_channels:
-            self.output = f"Вы не присоединены ни к одному каналу!"
+            self.output = "Вы не присоединены ни к одному каналу!"
             return False
         return True
 
@@ -70,12 +75,12 @@ class NamesCommand(ClientCommand):
         return f"NAMES {self._client.current_channel}"
 
 
-class PrivateMessageCommand(ClientCommand):
+class WhisperCommand(ClientCommand):
     usage = "/pm TARGET TEXT"
 
     def validate_args(self) -> bool:
         if len(self._args) < 2:
-            self.output = f"Неверное количество аргументов для команды!\nИспользуйте: {self.usage}"
+            self.output = ERR_ARGS_AMOUNT + self.usage
             return False
         return True
 
@@ -94,11 +99,11 @@ class JoinCommand(ClientCommand):
 
     def validate_args(self) -> bool:
         if len(self._args) != 1 and len(self._args) != 2:
-            self.output = f"Неверное количество аргументов для команды!\nИспользуйте: {self.usage}"
+            self.output = ERR_ARGS_AMOUNT + self.usage
             return False
 
         if not self._client.is_connected:
-            self.output = "Прежде чем вводить данную команду, подключитесь к серверу!"
+            self.output = ERR_NOT_CONNECTED
             return False
 
         ch_name = self._args[0].lower()
@@ -128,7 +133,7 @@ class NickCommand(ClientCommand):
         return True
 
 
-class DisconnectCommand(ClientCommand):
+class QuitCommand(ClientCommand):
     usage = "/quit"
 
     def execute(self) -> None:
@@ -137,33 +142,35 @@ class DisconnectCommand(ClientCommand):
         self._client.joined_channels = set()
         self._client.current_channel = None
         self._client.sock.shutdown(socket.SHUT_WR)
-        self.output = f"Отключение от сервера..."
+        self.output = "Отключение от сервера..."
 
     def validate_args(self) -> bool:
         if not super().validate_args():
             return False
 
         if not self._client.is_connected:
-            self.output = "Прежде чем вводить данную команду, подключитесь к серверу!"
+            self.output = ERR_NOT_CONNECTED
             return False
         return True
 
 
 class SwitchCommand(ClientCommand):
-    usage = "/switch CHANNEL"
+    usage = "/switch [CHANNEL]"
 
     def execute(self, ch_name: str) -> None:
         ch_name = ch_name.lower()
-        if ch_name in self._client.joined_channels and ch_name != self._client.current_channel:
-            self.output = f"Переключение текущего канала на {ch_name}..."
-            self._client.current_channel = ch_name
+        self.output = f"Переключение текущего канала на {ch_name}..."
+        self._client.current_channel = ch_name
 
     def validate_args(self) -> bool:
-        if not super().validate_args():
+        if len(self._args) != 0 and len(self._args) != 1:
+            self.output = ERR_ARGS_AMOUNT + self.usage
             return False
-
+        if len(self._args) == 0:
+            self.output = f"Активный канал: {self._client.current_channel}"
+            return False
         if not self._client.is_connected:
-            self.output = "Прежде чем вводить данную команду, подключитесь к серверу!"
+            self.output = ERR_NOT_CONNECTED
             return False
 
         ch_name = self._args[0].lower()
@@ -189,7 +196,7 @@ class ConnectCommand(ClientCommand):
 
     def validate_args(self) -> bool:
         if len(self._args) != 1 and len(self._args) != 2:
-            self.output = f"Неверное количество аргументов для команды!\nИспользуйте: {self.usage}"
+            self.output = ERR_ARGS_AMOUNT + self.usage
             return False
 
         if self._client.is_connected:
@@ -201,11 +208,14 @@ class ConnectCommand(ClientCommand):
         self._client.sock = socket.socket()
         self._client.sock.settimeout(10)
         try:
-            logger.info(f"Trying to connect to {hostname} with port {port}...")
+            logger.info(f"Trying to connect to {hostname}")
             self._client.sock.connect((hostname, port))
         except socket.gaierror as e:
             logger.info(f"Failed to connect by reason - {str(e)}")
-            self.output = f"Не удалось подключиться по заданному адресу: {hostname}"
+            self.output = f"Не удалось подключиться по адресу: {hostname}"
+            return ""
+        except OSError:
+            self.output = f"Не удалось подключиться по адресу: {hostname}"
             return ""
 
         logger.info("Successfully connected to server.")
@@ -233,7 +243,7 @@ class CodePageCommand(ClientCommand):
         self.output = f"Текущая кодировка изменена на {code_page}"
 
 
-class AddToFavCommand(ClientCommand):
+class AddFavCommand(ClientCommand):
     usage = "/add"
 
     def validate_args(self) -> bool:
@@ -241,14 +251,14 @@ class AddToFavCommand(ClientCommand):
             return False
 
         if not self._client.is_connected:
-            self.output = "Прежде чем вводить данную команду, подключитесь к серверу!"
+            self.output = ERR_NOT_CONNECTED
             return False
 
         return True
 
     def execute(self) -> None:
         self._client.favourites.add(self._client.hostname)
-        self.output = f"Сервер {self._client.hostname} добавлен в список избранных"
+        self.output = f"Сервер {self._client.hostname} добавлен в избранное"
 
 
 class ShowFavCommand(ClientCommand):
@@ -265,11 +275,8 @@ class ExitCommand(ClientCommand):
     usage = "/exit"
 
     def execute(self) -> None:
-        logger.info("Exiting application")
-        self._client.is_working = False
-        if self._client.is_connected:
-            self._client.is_connected = False
-            self._client.sock.shutdown(socket.SHUT_WR)
+        logger.info("Closing application")
+        self._client.exit_client()
 
 
 class UnknownCommand(ClientCommand):
