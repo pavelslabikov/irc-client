@@ -1,6 +1,6 @@
 import pytest
 from irc.client import Client
-import irc.commands as com
+import irc.models.commands as com
 
 
 def test_network_interaction(network_client: Client):

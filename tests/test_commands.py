@@ -1,6 +1,6 @@
 import pytest
-from irc.commands import ClientCommand
-import irc.commands as com
+from irc.models.commands import ClientCommand
+import irc.models.commands as com
 
 
 @pytest.mark.parametrize(

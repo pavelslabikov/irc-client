@@ -1,7 +1,7 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
 from irc.client import Client
 from irc.config import ClientConfig
-from irc.gui.workers import Worker
+from irc.gui.task_runners import BackgroundTask
 
 RESOURCE_PATH = "irc/gui/resources/"
 
@@ -70,8 +70,8 @@ class ClientWindow(QtWidgets.QMainWindow):
                 0, QtWidgets.QLabel(input_text)
             )
             self.input_line.clear()
-            input_thread = Worker(self.client.process_user_input, text)
-            QtCore.QThreadPool.globalInstance().start(input_thread)
+            thread = BackgroundTask(self.client.process_user_input, text)
+            QtCore.QThreadPool.globalInstance().start(thread)
 
     def print_chat_text(self, text: str):
         self.current_chat.layout().insertWidget(0, QtWidgets.QLabel(text))

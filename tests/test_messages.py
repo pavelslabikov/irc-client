@@ -1,6 +1,6 @@
 import pytest
-import irc.messages as msg
-import irc.commands as com
+import irc.models.messages as msg
+import irc.models.commands as com
 
 
 @pytest.mark.parametrize(

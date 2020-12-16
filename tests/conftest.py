@@ -1,5 +1,5 @@
 import pytest
-import irc.commands as com
+import irc.models.commands as com
 from irc.client import Client
 from irc.handlers import CommandHandler, MessageHandler
 from irc.cli.view import CliView

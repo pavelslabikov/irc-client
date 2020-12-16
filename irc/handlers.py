@@ -1,8 +1,7 @@
 import logging
 import shlex
-import irc.commands as com
-from irc import messages
-
+import irc.models.commands as com
+from irc.models import messages
 
 logger = logging.getLogger(__name__)
 

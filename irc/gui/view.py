@@ -1,6 +1,6 @@
 from irc.gui.window import ClientWindow
 from irc.view import BaseView
-from irc.messages import ServerMessage
+from irc.models.messages import ServerMessage
 
 
 class GuiView(BaseView):

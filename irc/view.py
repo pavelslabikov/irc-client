@@ -1,5 +1,5 @@
 import abc
-from irc.messages import ServerMessage
+from irc.models.messages import ServerMessage
 
 
 class BaseView(abc.ABC):

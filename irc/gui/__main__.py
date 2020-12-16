@@ -6,14 +6,14 @@ from irc.config import ClientConfig
 from irc.gui.window import ClientWindow
 from irc.gui.view import GuiView
 from irc.client import Client
-from irc.gui.workers import Worker
+from irc.gui.task_runners import BackgroundTask
 
 
 def start_client():
     main_window.client = client
     main_window.setup_ui()
     main_window.show()
-    response_thread = Worker(client.wait_for_response)
+    response_thread = BackgroundTask(client.wait_for_response)
     QThreadPool.globalInstance().start(response_thread)
 
 

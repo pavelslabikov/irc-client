@@ -1,5 +1,5 @@
 from irc.view import BaseView
-from irc.messages import ServerMessage
+from irc.models.messages import ServerMessage
 
 
 class CliView(BaseView):

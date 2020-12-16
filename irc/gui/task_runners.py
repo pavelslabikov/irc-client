@@ -1,9 +1,9 @@
 from PyQt5.QtCore import QRunnable
 
 
-class Worker(QRunnable):
+class BackgroundTask(QRunnable):
     def __init__(self, target: callable, *args):
-        super(Worker, self).__init__()
+        super(BackgroundTask, self).__init__()
         self.target = target
         self.args = args
 
