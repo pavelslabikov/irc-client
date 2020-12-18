@@ -25,8 +25,10 @@ class ClientConfig:
         config = ClientConfig.get_parser()
         config["Settings"]["nickname"] = client.nickname
         config["Settings"]["codepage"] = client.code_page
-        for server in client.favourites:
-            config.set("Servers", server)
+        config["Servers"].update(client.favourites)
+        if client.hostname in client.favourites:
+            channels = ",".join(client.joined_channels)
+            config["Servers"][client.hostname] = channels
 
         with open(const.CONFIG_PATH, "w") as file:
             config.write(file)

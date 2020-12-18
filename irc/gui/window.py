@@ -1,9 +1,11 @@
+import os
+
 from PyQt5 import QtWidgets, QtGui, QtCore
 from irc.client import Client
 from irc.config import ClientConfig
 from irc.gui.task_runners import BackgroundTask
 
-RESOURCE_PATH = "irc/gui/resources/"
+RESOURCE_PATH = "resources"
 
 
 class ClientWindow(QtWidgets.QMainWindow):
@@ -24,7 +26,8 @@ class ClientWindow(QtWidgets.QMainWindow):
         self.setObjectName("main_window")
         self.setWindowTitle("IRC Client")
         self.resize(800, 600)
-        self.setWindowIcon(QtGui.QIcon(RESOURCE_PATH + "icon.png"))
+        path_to_icon = os.path.join(RESOURCE_PATH, "icon.png")
+        self.setWindowIcon(QtGui.QIcon(path_to_icon))
         self.setToolButtonStyle(QtCore.Qt.ToolButtonIconOnly)
         self.setCentralWidget(self.central_widget)
 

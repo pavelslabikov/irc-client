@@ -16,4 +16,5 @@ class GuiView(BaseView):
             self.window.print_signal.emit(str(message))
 
     def display_channel(self, channel: str):
-        self.window.print_channel_signal.emit(channel)
+        if channel:
+            self.window.print_channel_signal.emit(channel)

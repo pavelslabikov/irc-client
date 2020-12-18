@@ -220,9 +220,15 @@ class ConnectCommand(ClientCommand):
 
         logger.info("Successfully connected to server.")
         self._client.sock.settimeout(None)
-        self._client.hostname = hostname
+        self._client.hostname = hostname.lower()
         self._client.is_connected = True
+        self.set_joined_channels(self._client.favourites.get(hostname))
         return f"NICK {self._client.nickname}\r\nUSER 1 1 1 1"
+
+    def set_joined_channels(self, channels_to_join: str):
+        if channels_to_join:
+            for channel in channels_to_join.split(","):
+                self._client.joined_channels.add(channel)
 
 
 class CodePageCommand(ClientCommand):
@@ -254,10 +260,14 @@ class AddFavCommand(ClientCommand):
             self.output = ERR_NOT_CONNECTED
             return False
 
+        if self._client.hostname in self._client.favourites:
+            self.output = "Сервер уже в списке избранных"
+            return False
+
         return True
 
     def execute(self) -> None:
-        self._client.favourites.add(self._client.hostname)
+        self._client.favourites[self._client.hostname] = ""
         self.output = f"Сервер {self._client.hostname} добавлен в избранное"
 
 
@@ -266,7 +276,7 @@ class ShowFavCommand(ClientCommand):
 
     def execute(self) -> None:
         servers = []
-        for server in self._client.favourites:
+        for server in self._client.favourites.keys():
             servers.append(server)
         self.output = "Список серверов в избранном:\n" + "\n".join(servers)
 

@@ -24,7 +24,7 @@ if __name__ == "__main__":
     client = Client(
         config["Settings"]["nickname"],
         config["Settings"]["codepage"],
-        set(config["Servers"].keys()),
+        dict(config["Servers"]),
         GuiView(main_window),
     )
     start_client()

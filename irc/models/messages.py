@@ -79,6 +79,9 @@ class ServiceMessage(ServerMessage):
             self.client.nickname = self.client.prev_nick
         if response_code == 322:
             self.client.view.display_channel(self.get_channel())
+        if response_code == 376:
+            channel_list = self.client.favourites.get(self.client.hostname)
+            self.join_from_cache(channel_list)
         return f"[{sender}] >> {text}"
 
     def get_channel(self) -> str:
@@ -86,6 +89,11 @@ class ServiceMessage(ServerMessage):
         match = re.search(pattern, self.raw_message)
         if match:
             return match.groupdict()["chan"]
+
+    def join_from_cache(self, channels: str):
+        if channels:
+            message = f"JOIN {channels}\r\n".encode(self.client.code_page)
+            self.client.sock.sendall(message)
 
 
 class NickMessage(ServerMessage):

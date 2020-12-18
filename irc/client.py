@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class Client:
     def __init__(
-        self, nickname: str, encoding: str, favourites: set, view: BaseView
+        self, nickname: str, encoding: str, favourites: dict, view: BaseView
     ):
         self.sock = socket.socket()
         self.favourites = favourites
