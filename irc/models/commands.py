@@ -71,6 +71,14 @@ class ListCommand(ClientCommand):
 class NamesCommand(ClientCommand):
     usage = "/names"
 
+    def validate_args(self) -> bool:
+        if not super().validate_args():
+            return False
+
+        if not self._client.current_channel:
+            self.output = "Не выбран активный канал! Используйте /switch"
+            return False
+
     def execute(self) -> str:
         return f"NAMES {self._client.current_channel}"
 
@@ -167,7 +175,9 @@ class SwitchCommand(ClientCommand):
             self.output = ERR_ARGS_AMOUNT + self.usage
             return False
         if len(self._args) == 0:
-            self.output = f"Активный канал: {self._client.current_channel}"
+            self.output = f"Активный канал: {self._client.current_channel}\n"
+            channel_list = ' '.join(self._client.joined_channels)
+            self.output += f"Присоединённые каналы: {channel_list}"
             return False
         if not self._client.is_connected:
             self.output = ERR_NOT_CONNECTED
