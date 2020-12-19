@@ -7,35 +7,50 @@ import irc.models.commands as com
     "message_type, raw_message, expected_result",
     [
         (
-            msg.JoinMessage,
-            ":nick!user JOIN :#channel",
-            "nick присоединился к #channel",
+                msg.JoinMessage,
+                ":nick!user JOIN :#channel",
+                "nick присоединился к #channel",
         ),
         (
-            msg.ModeMessage,
-            ":bot!@service MODE #test -i",
-            "bot!@service установил для #test флаг -i",
+                msg.ModeMessage,
+                ":bot!@service MODE #test -i",
+                "bot!@service установил для #test флаг -i",
         ),
         (msg.ModeMessage, ":nick MODE nick -r", "nick сменил свой флаг на -r"),
         (
-            msg.NickMessage,
-            ":nick!0.0.0@user NICK new_nick1",
-            "nick сменил ник на new_nick1",
+                msg.NickMessage,
+                ":nick!0.0.0@user NICK new_nick1",
+                "nick сменил ник на new_nick1",
         ),
         (
-            msg.ServiceMessage,
-            ":irc.ircnet.su 200 target :text",
-            "[irc.ircnet.su] >> text",
+                msg.ServiceMessage,
+                ":irc.ircnet.su 322 target :text",
+                "[irc.ircnet.su] >> text",
         ),
         (
-            msg.PrivateMessage,
-            ":nick PRIVMSG target :test text",
-            "[target] <nick>: test text",
+                msg.PrivateMessage,
+                ":nick PRIVMSG target :test text",
+                "[target] <nick>: test text",
+        ),
+        (
+                msg.PartMessage,
+                ":WiZ!jto@ PART #playzone",
+                "WiZ покинул #playzone",
+        ),
+        (
+                msg.NoticeMessage,
+                ":sender NOTICE target :test text",
+                "[sender] >> test text",
+        ),
+        (
+                msg.JoinMessage,
+                ":nick!user JOIN",
+                ":nick!user JOIN",
         ),
     ],
 )
 def test_message_reg_exp(
-    tested_client, message_type, raw_message: str, expected_result: str
+        tested_client, message_type, raw_message: str, expected_result: str
 ):
     message = message_type(tested_client, raw_message)
     assert str(message) == expected_result

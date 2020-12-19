@@ -19,12 +19,3 @@ def test_incorrect_hostname(network_client: Client, hostname: str):
     assert not network_client.hostname
     assert command.output.startswith("Не удалось подключиться")
     com.ExitCommand(network_client)()
-
-
-def test_sending_input(tested_client: Client):
-    try:
-        tested_client.process_user_input("test_text")
-    except OSError:
-        assert True
-    else:
-        assert False

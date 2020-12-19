@@ -1,5 +1,5 @@
 import pytest
-import irc.models.commands as com
+
 from irc.client import Client
 from irc.handlers import CommandHandler, MessageHandler
 from irc.cli.view import CliView
@@ -7,17 +7,19 @@ from irc.cli.view import CliView
 
 @pytest.fixture()
 def tested_client() -> Client:
-    client = Client("TestName", "cp866", set("fav_server"), CliView())
+    client = Client("TestName", "cp866", {"fav_server": ""}, CliView())
     client.is_connected = True
     client.hostname = "test_server"
+    client.current_channel = "#test"
+    client.joined_channels.add("#test")
     return client
 
 
 @pytest.fixture()
 def network_client() -> Client:
-    client = Client("TestName", "cp866", set(), CliView())
+    client = Client("TestName", "cp866", {}, CliView())
     yield client
-    com.ExitCommand(client)
+    client.exit_client()
 
 
 @pytest.fixture()
