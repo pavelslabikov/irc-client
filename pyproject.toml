@@ -15,4 +15,5 @@ exclude = '''
 '''
 
 [tool.coverage.run]
+source = ["irc"]
 omit = ["setup.py"]

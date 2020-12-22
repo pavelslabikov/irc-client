@@ -1,5 +1,4 @@
 import pytest
-from irc.models.commands import ClientCommand
 import irc.models.commands as com
 
 from unittest import mock
